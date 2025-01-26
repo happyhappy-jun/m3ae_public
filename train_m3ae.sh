@@ -20,7 +20,7 @@ export WANDB_API_KEY=cbc758f8b3dd320229b848097505e9712d6f6895
 wandb online
 
 # Run training command
-~/miniconda3/envs/m3ae_public/bin/python -m m3ae.m3ae_main \
+python -m m3ae.m3ae_main \
     --m3ae.model_type='small' \
     --m3ae.image_mask_ratio=0.75 \
     --m3ae.embedding_mask_ratio=0.75 \
