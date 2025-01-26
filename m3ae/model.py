@@ -481,7 +481,7 @@ class MaskedMultimodalAutoencoder(nn.Module):
 
         self.decoder_embedding_output = MLP(
             self.config.dec_emb_dim,
-            self.config.embed_dim,
+            self.config.emb_dim,
             self.config.output_head_depth,
             input_norm=self.config.output_head_depth > 0,
         )
