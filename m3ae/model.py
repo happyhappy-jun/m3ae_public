@@ -667,6 +667,8 @@ class MaskedMultimodalAutoencoder(nn.Module):
             image_ids_restore,
             text_ids_restore,
         ) = self.forward_encoder(image, embedding_patch, deterministic)
+        print("#################")
+        print(embedding_x.shape)
         image_output, text_output = self.forward_decoder(
             cls_x,
             image_x,
