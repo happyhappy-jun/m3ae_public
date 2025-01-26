@@ -667,8 +667,6 @@ class MaskedMultimodalAutoencoder(nn.Module):
         x = self.decoder(x, deterministic)
 
         cls_x = x[:, :1, :]
-        print(x[: , 1:image_ids_restore.shape[0] + 1, :].shape)
-        print(x[:, image_ids_restore.shape[0] + 1:, :].shape)
         if image_x is None:
             image_output = None
             text_output = self.decoder_embedding_output(x[:, 1:, :])
@@ -693,9 +691,6 @@ class MaskedMultimodalAutoencoder(nn.Module):
             image_ids_restore,
             text_ids_restore,
         ) = self.forward_encoder(image, embedding_patch, deterministic)
-        print("#################")
-        print(image_x.shape)
-        print(embedding_x.shape)
         image_output, text_output = self.forward_decoder(
             cls_x,
             image_x,
