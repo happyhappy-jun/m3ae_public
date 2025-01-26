@@ -67,19 +67,21 @@ def mse_loss(pred, real, valid=None):
         valid = all_mask(real)
     valid_text_length = jnp.maximum(jnp.sum(valid, axis=-1), 1e-5)
 
+    # logits shape: (512, 3072)
+    # tokens shape: (512, 8, 384) -> needs to be (512, 3072)
+    pred_reshaped = pred.reshape(pred.shape[0], -1)  # (512, 3072)
 
-    pred_reshaped = pred.reshape(pred.shape[0], -1)
-    print("pred", pred_reshaped.shape)
-    print(real.shape)
     # Calculate MSE loss
-    squared_diff = jnp.square(pred_reshaped - real)
-    # Apply valid mask if needed
-    valid_reshaped = valid.reshape(valid.shape[0], -1)
-    valid_reshaped = jnp.expand_dims(valid_reshaped, -1)
+    squared_diff = jnp.square(pred_reshaped - real)  # (512, 3072)
+
+    # Reshape valid mask to match
+    valid_reshaped = valid.reshape(valid.shape[0], -1)  # Should be (512, 3072)
+
+    # Apply mask
     masked_squared_diff = jnp.where(valid_reshaped > 0.0, squared_diff, 0.0)
 
     # Average over valid positions
-    loss = jnp.mean(jnp.sum(masked_squared_diff, axis=(1, 2)) / valid_text_length)
+    loss = jnp.mean(jnp.sum(masked_squared_diff, axis=-1) / valid_text_length)
 
     return loss
 
