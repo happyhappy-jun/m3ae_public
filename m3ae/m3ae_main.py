@@ -25,7 +25,7 @@ from .model import (
     MaskedMultimodalAutoencoder, extract_patches,
     merge_patches, cross_entropy_loss_and_accuracy,
     patch_mse_loss, M3AETrainState, mask_intersection, mask_not,
-    mask_select, all_mask
+    mask_select, all_mask, mse_loss
 )
 from .utils import (
     WandBLogger, define_flags_with_default, get_user_flags,
@@ -100,7 +100,7 @@ def create_train_step(model, learning_rate, encode_image=None, decode_image=None
                 )
                 image_accuracy = 0.0
 
-            text_loss, text_accuracy = cross_entropy_loss_and_accuracy(
+            text_loss = mse_loss(
                 text_output, text,
             )
 
@@ -140,10 +140,6 @@ def create_train_step(model, learning_rate, encode_image=None, decode_image=None
                 text_loss=text_loss,
                 loss=loss,
                 image_accuracy=image_accuracy,
-                text_accuracy=text_accuracy,
-                text_token_ratio=jnp.mean(
-                    jnp.sum((1.0 - text_padding_mask), axis=-1) / text_mask.shape[-1]
-                ),
                 average_text_length=average_text_length,
             )
             if FLAGS.unpaired_text_loss_weight > 0.0:

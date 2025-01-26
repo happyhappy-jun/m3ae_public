@@ -62,6 +62,28 @@ def cross_entropy_loss_and_accuracy(logits, tokens, valid=None):
     return loss, accuracy
 
 
+def mse_loss(logits, tokens, valid=None):
+    if valid is None:
+        valid = all_mask(tokens)
+    valid_text_length = jnp.maximum(jnp.sum(valid, axis=-1), 1e-5)
+
+    # Reshape tokens from (512, 8, 384) to (512, 3072)
+    tokens_reshaped = tokens.reshape(tokens.shape[0], -1)
+    # Add extra dimension to match logits shape
+    tokens_reshaped = jnp.expand_dims(tokens_reshaped, -1)  # (512, 3072, 1)
+
+    # Calculate MSE loss
+    squared_diff = jnp.square(logits - tokens_reshaped)
+    # Apply valid mask if needed
+    valid_reshaped = valid.reshape(valid.shape[0], -1)
+    valid_reshaped = jnp.expand_dims(valid_reshaped, -1)
+    masked_squared_diff = jnp.where(valid_reshaped > 0.0, squared_diff, 0.0)
+
+    # Average over valid positions
+    loss = jnp.mean(jnp.sum(masked_squared_diff, axis=(1, 2)) / valid_text_length)
+
+    return loss
+
 def patch_mse_loss(patch_output, patch_target, valid=None):
     if valid is None:
         valid = all_mask(patch_target)
@@ -656,8 +678,6 @@ class MaskedMultimodalAutoencoder(nn.Module):
             image_output = self.decoder_image_output(x[:, 1:image_ids_restore.shape[0] + 1, :])
             text_output = self.decoder_embedding_output(x[:, image_ids_restore.shape[0] + 1:, :])
 
-        print(image_output.shape)
-        print(text_output.shape)
         return image_output, text_output
 
     def __call__(self, image, embedding, deterministic=False):
