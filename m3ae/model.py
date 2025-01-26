@@ -62,21 +62,16 @@ def cross_entropy_loss_and_accuracy(logits, tokens, valid=None):
     return loss, accuracy
 
 
-def mse_loss(logits, tokens, valid=None):
+def mse_loss(pred, real, valid=None):
     if valid is None:
-        valid = all_mask(tokens)
+        valid = all_mask(real)
     valid_text_length = jnp.maximum(jnp.sum(valid, axis=-1), 1e-5)
 
-    # Reshape tokens from (512, 8, 384) to (512, 3072)
-    tokens_reshaped = tokens.reshape(tokens.shape[0], -1)
-    # Add extra dimension to match logits shape
-    tokens_reshaped = jnp.expand_dims(tokens_reshaped, -1)  # (512, 3072, 1)
-
     print("loss")
-    print(logits.shape)
-    print(tokens_reshaped.shape)
+    print(pred.shape)
+    print(real.shape)
     # Calculate MSE loss
-    squared_diff = jnp.square(logits - tokens_reshaped)
+    squared_diff = jnp.square(pred - real)
     # Apply valid mask if needed
     valid_reshaped = valid.reshape(valid.shape[0], -1)
     valid_reshaped = jnp.expand_dims(valid_reshaped, -1)
