@@ -73,8 +73,7 @@ def create_train_step(model, learning_rate, encode_image=None, decode_image=None
     def train_step_fn(state, rng, accumulated_grads, accumulated_steps, batch):
         rng_generator = JaxRNG(rng)
         image = batch['image']
-        text = batch['text']
-        text_padding_mask = batch['text_padding_mask']
+        text = batch['embedding']
 
         def loss_fn(params):
             image_patches = extract_patches(image, FLAGS.patch_size)
@@ -85,7 +84,6 @@ def create_train_step(model, learning_rate, encode_image=None, decode_image=None
                 params,
                 image_patches,
                 text,
-                text_padding_mask,
                 deterministic=False,
                 rngs=rng_generator(keys=model.rng_keys()),
             )
@@ -104,19 +102,15 @@ def create_train_step(model, learning_rate, encode_image=None, decode_image=None
 
             text_loss, text_accuracy = cross_entropy_loss_and_accuracy(
                 text_output, text,
-                mask_intersection(
-                    all_mask(text) if FLAGS.text_all_token_loss else text_mask,
-                    mask_not(text_padding_mask)
-                )
             )
 
             loss = (
                 FLAGS.image_loss_weight * image_loss
                 + FLAGS.text_loss_weight * text_loss
             )
-
-            average_text_length = jnp.mean(jnp.sum(mask_not(text_padding_mask), axis=-1))
-
+            print(text)
+            # average_text_length = jnp.mean(jnp.sum(mask_not(text_padding_mask), axis=-1))
+            average_text_length = 0.0
             if FLAGS.unpaired_text_loss_weight > 0.0:
                 unpaired_text = batch['unpaired_text']
                 unpaired_text_padding_mask = batch['unpaired_text_padding_mask']
@@ -352,7 +346,7 @@ def main(argv):
 
         while True:
             batch = {}
-            image, text, text_padding_mask = next(paired_iterator)
+            image, text = next(paired_iterator)
             batch['image'] = image.astype(np.float32)
             batch['embedding'] = text.astype(np.int32)
 
