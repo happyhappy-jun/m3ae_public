@@ -67,11 +67,9 @@ def mse_loss(pred, real, valid=None):
         valid = all_mask(real)
     valid_text_length = jnp.maximum(jnp.sum(valid, axis=-1), 1e-5)
 
-    print("loss")
-    print(pred.shape)
-    print(real.shape)
+    pred_reshaped = pred.reshape(pred.shape[0], -1)
     # Calculate MSE loss
-    squared_diff = jnp.square(pred - real)
+    squared_diff = jnp.square(pred_reshaped - real)
     # Apply valid mask if needed
     valid_reshaped = valid.reshape(valid.shape[0], -1)
     valid_reshaped = jnp.expand_dims(valid_reshaped, -1)
