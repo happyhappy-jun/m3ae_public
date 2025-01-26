@@ -617,10 +617,12 @@ class MaskedMultimodalAutoencoder(nn.Module):
             padding_masks.append(jnp.zeros((batch_size, image_ids_restore.shape[0]), dtype=jnp.float32))
 
         if embedding_x is not None:
+
             embedding_keep_length = int(
                 text_ids_restore.shape[0] * (1.0 - self.config.embedding_mask_ratio)
             )
             embedding_x = self.decoder_input_projection(embedding_x)
+            print(embedding_x.shape)
             masked_embedding_x = jnp.broadcast_to(
                 self.embedding_mask_embedding,
                 (
@@ -638,6 +640,7 @@ class MaskedMultimodalAutoencoder(nn.Module):
                     + self.get_type_embedding('decoder_embedding_type_embedding')
             )
             input_tensors.append(embedding_x)
+            print(embedding_x.shape)
 
         x = jnp.concatenate(input_tensors, axis=1)
         x = self.decoder(x, deterministic)
