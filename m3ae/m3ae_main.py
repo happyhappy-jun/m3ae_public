@@ -109,6 +109,7 @@ def create_train_step(model, learning_rate, encode_image=None, decode_image=None
                 + FLAGS.text_loss_weight * text_loss
             )
             print(text)
+            print(text.shape)
             # average_text_length = jnp.mean(jnp.sum(mask_not(text_padding_mask), axis=-1))
             average_text_length = 0.0
             if FLAGS.unpaired_text_loss_weight > 0.0:

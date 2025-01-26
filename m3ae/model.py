@@ -577,7 +577,7 @@ class MaskedMultimodalAutoencoder(nn.Module):
             image_x = x[:, 1:image_keep_length + 1, :]
             text_x = x[:, image_keep_length + 1:, :]
 
-        return cls_x, image_x, text_x, image_mask, image_ids_restore, text_ids_restore
+        return cls_x, image_x, text_x, image_mask, text_mask, image_ids_restore, text_ids_restore
 
     def forward_decoder(
         self,
@@ -663,6 +663,7 @@ class MaskedMultimodalAutoencoder(nn.Module):
             image_x,
             embedding_x,
             image_mask,
+            text_mask,
             image_ids_restore,
             text_ids_restore,
         ) = self.forward_encoder(image, embedding_patch, deterministic)
@@ -674,7 +675,7 @@ class MaskedMultimodalAutoencoder(nn.Module):
             text_ids_restore,
             deterministic,
         )
-        return image_output, text_output, image_mask
+        return image_output, text_output, image_mask, text_mask
 
 
 class MaskedAutoencoder(nn.Module):
