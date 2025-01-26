@@ -39,7 +39,7 @@ python3 -m m3ae.m3ae_main \
     --lr_peak_value=1.5e-4 \
     --weight_decay=0.05 \
     --load_checkpoint='' \
-    --entity="happyhappy-jun"
+    --entity="happyhappy-jun" \
     --data.path="/mnt/nas/slurm_account/junyoon/output_wembedding.h5" \
     --data.transform_type='pretrain' \
     --data.image_normalization='imagenet'
