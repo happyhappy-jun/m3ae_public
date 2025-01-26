@@ -18,7 +18,7 @@ from flax.jax_utils import prefetch_to_device
 from flax.training.train_state import TrainState
 from tqdm.auto import tqdm, trange
 
-from .data import ImageTextDataset, ImageNetDataset
+from .data import ImageEmbeddingDataset, ImageNetDataset
 from .jax_utils import (
     JaxRNG, get_metrics, next_rng, accumulated_gradient,
     sync_state_across_devices
@@ -58,7 +58,7 @@ FLAGS_DEF = define_flags_with_default(
     load_checkpoint="",
     dataset="cc12m",
     mae=MaskedAutoencoder.get_default_config(),
-    cc12m_data=ImageTextDataset.get_default_config(),
+    cc12m_data=ImageEmbeddingDataset.get_default_config(),
     imagenet_data=ImageNetDataset.get_default_config(),
     logging=WandBLogger.get_default_config(),
     log_all_worker=False,
@@ -176,7 +176,7 @@ def main(argv):
 
     if FLAGS.dataset == "cc12m":
         FLAGS.cc12m_data.image_only = True
-        dataset = ImageTextDataset(FLAGS.cc12m_data, jax_process_index / jax_process_count)
+        dataset = ImageEmbeddingDataset(FLAGS.cc12m_data, jax_process_index / jax_process_count)
     elif FLAGS.dataset == "imagenet":
         FLAGS.imagenet_data.image_only = True
         dataset = ImageNetDataset(FLAGS.imagenet_data, jax_process_index / jax_process_count)

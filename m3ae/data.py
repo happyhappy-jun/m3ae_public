@@ -18,7 +18,7 @@ import torchvision
 from torchvision import transforms
 
 
-class ImageTextDataset(torch.utils.data.Dataset):
+class ImageEmbeddingDataset(torch.utils.data.Dataset):
     @staticmethod
     def get_default_config(updates=None):
         config = ConfigDict()
@@ -29,9 +29,6 @@ class ImageTextDataset(torch.utils.data.Dataset):
         config.random_start = False
 
         config.image_only = False
-        config.tokenize = True
-        config.tokenizer = "bert-base-uncased"
-        config.tokenizer_max_length = 64
 
         config.transform_type = "pretrain"
         config.image_size = 256
@@ -39,9 +36,6 @@ class ImageTextDataset(torch.utils.data.Dataset):
         config.image_normalization = 'cc12m'
         config.custom_image_mean = ''
         config.custom_image_std = ''
-
-        config.random_drop_text = 0.0
-        config.deterministic_drop_text = 0.0
 
         if updates is not None:
             config.update(ConfigDict(updates).copy_and_resolve_references())
@@ -129,11 +123,6 @@ class ImageTextDataset(torch.utils.data.Dataset):
         else:
             raise ValueError("Unsupported transform_type!")
 
-        if self.config.tokenize:
-            self.tokenizer = transformers.BertTokenizer.from_pretrained(
-                self.config.tokenizer
-            )
-
         if self.config.random_start:
             # Bypass numpy random seed
             self.random_start_offset = np.random.default_rng().choice(len(self))
@@ -160,11 +149,6 @@ class ImageTextDataset(torch.utils.data.Dataset):
         index = (index + self.random_start_offset) % len(self)
         return index + self.config.start_index
 
-    def drop_text(self, raw_index):
-        deterministic_drop = float(raw_index % 100) / 100. < self.config.deterministic_drop_text
-        random_drop = np.random.rand() < self.config.random_drop_text
-        return deterministic_drop or random_drop
-
     def __getitem__(self, raw_index):
         index = self.process_index(raw_index)
         with BytesIO(self.h5_file["jpg"][index]) as fin:
@@ -182,34 +166,9 @@ class ImageTextDataset(torch.utils.data.Dataset):
         if self.config.image_only:
             return image
 
-        with BytesIO(self.h5_file["caption"][index]) as fin:
-            caption = fin.read().decode("utf-8")
+        embedding = self.h5_file["embedding"][index]
 
-        if not self.config.tokenize:
-            return image, caption
-
-        if len(caption) == 0 or self.drop_text(raw_index):
-            tokenized_caption = np.zeros(self.config.tokenizer_max_length, dtype=np.int32)
-            padding_mask = np.ones(self.config.tokenizer_max_length, dtype=np.float32)
-            return image, tokenized_caption, padding_mask
-
-        encoded_caption = self.tokenizer(
-            caption,
-            padding="max_length",
-            truncation=True,
-            max_length=self.config.tokenizer_max_length,
-            return_tensors="np",
-            add_special_tokens=False,
-        )
-
-        if encoded_caption["input_ids"][0].size == 0:  # Empty token
-            tokenized_caption = np.zeros(self.config.tokenizer_max_length, dtype=np.int32)
-            padding_mask = np.ones(self.config.tokenizer_max_length, dtype=np.float32)
-        else:
-            tokenized_caption = encoded_caption["input_ids"][0]
-            padding_mask = 1.0 - encoded_caption["attention_mask"][0].astype(np.float32)
-
-        return image, tokenized_caption, padding_mask
+        return image, embedding
 
     @property
     def vocab_size(self):
@@ -400,6 +359,67 @@ class ImageNetDataset(torch.utils.data.Dataset):
     def num_classes(self):
         return 1000
 
+
+class EmbeddingDataset(torch.utils.data.Dataset):
+    @staticmethod
+    def get_default_config(updates=None):
+        config = ConfigDict()
+        config.path = ""
+
+        config.start_index = 0
+        config.max_length = int(1e9)
+        config.random_start = True
+
+        if updates is not None:
+            config.update(ConfigDict(updates).copy_and_resolve_references())
+        return config
+
+    def __init__(self, config, start_offset_ratio=None):
+        self.config = self.get_default_config(config)
+        assert self.config.path != ""
+
+        if self.config.path.startswith("gs://"):
+            # Loading from GCS
+            self.h5_file = h5py.File(
+                gcsfs.GCSFileSystem().open(self.config.path, cache_type="block"), "r"
+            )
+        else:
+            self.h5_file = h5py.File(self.config.path, "r")
+
+        if self.config.random_start:
+            # Bypass numpy random seed
+            self.random_start_offset = np.random.default_rng().choice(len(self))
+        elif start_offset_ratio is not None:
+            self.random_start_offset = int(len(self) * start_offset_ratio) % len(self)
+        else:
+            self.random_start_offset = 0
+
+    def __getstate__(self):
+        return self.config, self.random_start_offset
+
+    def __setstate__(self, state):
+        config, random_start_offset = state
+        self.__init__(config)
+        self.random_start_offset = random_start_offset
+
+    def __len__(self):
+        return min(
+            self.h5_file["embedding"].shape[0] - self.config.start_index,
+            self.config.max_length,
+        )
+
+    def process_index(self, index):
+        index = (index + self.random_start_offset) % len(self)
+        return index + self.config.start_index
+
+    def __getitem__(self, raw_index):
+        index = self.process_index(raw_index)
+        embedding = self.h5_file["embedding"][index]
+        return embedding.astype(np.float32)
+
+    @property
+    def vocab_size(self):
+        return self.tokenizer.vocab_size
 
 class TextDataset(torch.utils.data.Dataset):
     @staticmethod

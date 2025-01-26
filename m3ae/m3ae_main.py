@@ -16,7 +16,7 @@ from flax import linen as nn
 from flax.jax_utils import prefetch_to_device
 from tqdm.auto import tqdm, trange
 
-from .data import ImageTextDataset, TextDataset
+from .data import ImageEmbeddingDataset, TextDataset
 from .jax_utils import (
     JaxRNG, get_metrics, next_rng, accumulated_gradient,
     sync_state_across_devices
@@ -60,7 +60,7 @@ FLAGS_DEF = define_flags_with_default(
     weight_decay=0.05,
     load_checkpoint="",
     m3ae=MaskedMultimodalAutoencoder.get_default_config(),
-    data=ImageTextDataset.get_default_config(),
+    data=ImageEmbeddingDataset.get_default_config(),
     unpaired_text_data=TextDataset.get_default_config(),
     logging=WandBLogger.get_default_config(),
     log_all_worker=True,
@@ -236,7 +236,7 @@ def main(argv):
     )
     set_random_seed(FLAGS.seed * (jax_process_index + 1))
 
-    dataset = ImageTextDataset(FLAGS.data, jax_process_index / jax_process_count)
+    dataset = ImageEmbeddingDataset(FLAGS.data, jax_process_index / jax_process_count)
     dataloader = torch.utils.data.DataLoader(
         dataset,
         batch_size=process_batch_size,
@@ -356,8 +356,7 @@ def main(argv):
             batch = {}
             image, text, text_padding_mask = next(paired_iterator)
             batch['image'] = image.astype(np.float32)
-            batch['text'] = text.astype(np.int32)
-            batch['text_padding_mask'] = text_padding_mask.astype(np.float32)
+            batch['embedding'] = text.astype(np.int32)
 
             if FLAGS.unpaired_text_loss_weight > 0.0:
                 unpaired_text, unpaired_text_padding_mask = next(unpaired_text_iterator)

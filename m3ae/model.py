@@ -327,9 +327,24 @@ class Transformer(nn.Module):
         return x
 
 
+class EmbeddingEmbed(nn.Module):
+    embed_dim: int
+
+    @nn.compact
+    def __call__(self, x):
+        # x shape: (batch_size, 3072)
+
+        # First reshape the flat vector to (batch_size, num_patches, patch_dim)
+        self.num_patches = x.shape[-1] // self.embed_dim
+        x = x.reshape(-1, self.num_patches, self.embed_dim)
+
+        # Apply either identity or linear transformation
+        x = nn.Dense(features=self.num_patches, use_bias=False, kernel_init=nn.initializers.ones)(x)
+        return x
+
+
 class MaskedMultimodalAutoencoder(nn.Module):
     config_updates: ... = None
-    text_vocab_size: int = -1
     image_output_dim: int = 768
 
     @staticmethod
@@ -353,7 +368,7 @@ class MaskedMultimodalAutoencoder(nn.Module):
 
         # Tuned default mask ratio
         config.image_mask_ratio = 0.75
-        config.text_mask_ratio = 0.75
+        config.embedding_mask_ratio = 0.75
 
         config.use_type_embedding = True
 
@@ -373,21 +388,17 @@ class MaskedMultimodalAutoencoder(nn.Module):
     def no_decay_list(self):
         # model specific no decay list
         no_decay = [
-            'cls_token', 'encoder_image_type_embedding', 'encoder_text_type_embedding',
-            'decoder_image_type_embedding', 'decoder_text_type_embedding',
-            'image_mask_embedding', 'text_mask_embedding', 'text_embedding',
+            'cls_token', 'encoder_image_type_embedding', 'encoder_embedding_type_embedding',
+            'decoder_image_type_embedding', 'decoder_embedding_type_embedding',
+            'image_mask_embedding', 'embedding_mask_embedding', 'text_embedding',
             'bias', 'embedding',
         ]
         return no_decay
 
     def setup(self):
         self.config = self.get_default_config(self.config_updates)
-        assert self.text_vocab_size > 0
 
-        self.text_embedding = nn.Embed(
-            self.text_vocab_size, self.config.emb_dim,
-            embedding_init=jax.nn.initializers.normal(stddev=1.0)
-        )
+        self.embedding_embedding = EmbeddingEmbed(self.config.emb_dim)
         self.image_embedding = nn.Dense(
             self.config.emb_dim,
             kernel_init=nn.initializers.xavier_uniform()
@@ -405,13 +416,13 @@ class MaskedMultimodalAutoencoder(nn.Module):
                 nn.initializers.normal(stddev=0.02, dtype=jnp.float32),
                 (1, 1, self.config.dec_emb_dim),
             )
-            self.encoder_text_type_embedding = self.param(
-                "encoder_text_type_embedding",
+            self.encoder_embedding_type_embedding = self.param(
+                "encoder_embedding_type_embedding",
                 nn.initializers.normal(stddev=0.02, dtype=jnp.float32),
                 (1, 1, self.config.emb_dim),
             )
-            self.decoder_text_type_embedding = self.param(
-                "decoder_text_type_embedding",
+            self.decoder_embedding_type_embedding = self.param(
+                "decoder_embedding_type_embedding",
                 nn.initializers.normal(stddev=0.02, dtype=jnp.float32),
                 (1, 1, self.config.dec_emb_dim),
             )
@@ -427,8 +438,8 @@ class MaskedMultimodalAutoencoder(nn.Module):
             nn.initializers.normal(stddev=0.02, dtype=jnp.float32),
             (1, 1, self.config.dec_emb_dim),
         )
-        self.text_mask_embedding = self.param(
-            "text_mask_embedding",
+        self.embedding_mask_embedding = self.param(
+            "embedding_mask_embedding",
             nn.initializers.normal(stddev=0.02, dtype=jnp.float32),
             (1, 1, self.config.dec_emb_dim),
         )
@@ -476,9 +487,9 @@ class MaskedMultimodalAutoencoder(nn.Module):
         if self.config.use_type_embedding:
             return {
                 'encoder_image_type_embedding': self.encoder_image_type_embedding,
-                'encoder_text_type_embedding': self.encoder_text_type_embedding,
+                'encoder_embedding_type_embedding': self.encoder_embedding_type_embedding,
                 'decoder_image_type_embedding': self.decoder_image_type_embedding,
-                'decoder_text_type_embedding': self.decoder_text_type_embedding,
+                'decoder_embedding_type_embedding': self.decoder_embedding_type_embedding,
             }[name]
         else:
             return 0.0
@@ -487,7 +498,6 @@ class MaskedMultimodalAutoencoder(nn.Module):
         batch_size = image.shape[0]
         cls_token = jnp.broadcast_to(self.cls_token, (batch_size, 1, self.config.emb_dim))
         input_tensors = [cls_token]
-        padding_masks = [jnp.zeros((batch_size,  1), dtype=jnp.float32)]
         if image is not None:
             image_x = (
                 self.image_embedding(image)
@@ -495,30 +505,26 @@ class MaskedMultimodalAutoencoder(nn.Module):
                 + self.get_type_embedding('encoder_image_type_embedding')
             )
             input_tensors.append(image_x)
-            padding_masks.append(jnp.zeros((batch_size, image.shape[1]), dtype=jnp.float32))
 
         if text is not None:
-            text_x = (
-                self.text_embedding(text)
+            embedding_x = (
+                self.embedding_embedding(text)
                 + get_1d_sincos_pos_embed(self.config.emb_dim, text.shape[1])
-                + self.get_type_embedding('encoder_text_type_embedding')
+                + self.get_type_embedding('encoder_embedding_type_embedding')
             )
-            input_tensors.append(text_x)
-            padding_masks.append(text_padding_mask)
+            input_tensors.append(embedding_x)
 
         x = jnp.concatenate(input_tensors, axis=1)
-        padding_mask = jnp.concatenate(padding_masks, axis=1)
-        x = self.encoder(x, deterministic, padding_mask)
+        x = self.encoder(x, deterministic)
         return x
 
-    def forward_encoder(self, image, text, text_padding_mask, deterministic=False):
+    def forward_encoder(self, image, embedding_patch, deterministic=False):
         if image is not None:
             batch_size = image.shape[0]
         else:
-            batch_size = text.shape[0]
+            batch_size = embedding_patch.shape[0]
         cls_token = jnp.broadcast_to(self.cls_token, (batch_size, 1, self.config.emb_dim))
         input_tensors = [cls_token]
-        padding_masks = [jnp.zeros((batch_size, 1), dtype=jnp.float32)]
         if image is not None:
             image_keep_length = int(
                 image.shape[1] * (1.0 - self.config.image_mask_ratio)
@@ -532,56 +538,51 @@ class MaskedMultimodalAutoencoder(nn.Module):
                 image_x, self.make_rng("noise"), image_keep_length
             )
             input_tensors.append(image_x)
-            padding_masks.append(jnp.zeros((batch_size, image_keep_length), dtype=jnp.float32))
         else:
             image_mask = image_ids_restore = None
 
-        if text is not None:
+        if embedding_patch is not None:
             text_keep_length = int(
-                text.shape[1] * (1.0 - self.config.text_mask_ratio)
+                embedding_patch.shape[1] * (1.0 - self.config.text_mask_ratio)
             )
             text_x = (
-                self.text_embedding(text)
-                + get_1d_sincos_pos_embed(self.config.emb_dim, text.shape[1])
-                + self.get_type_embedding('encoder_text_type_embedding')
+                embedding_patch
+                + get_1d_sincos_pos_embed(self.config.emb_dim, embedding_patch.shape[1])
+                + self.get_type_embedding('encoder_embedding_type_embedding')
             )
-            text_x, text_mask, text_ids_restore, text_padding_mask = random_masking(
+            text_x, text_mask, text_ids_restore = random_masking(
                 text_x,
                 self.make_rng("noise"),
                 text_keep_length,
-                text_padding_mask,
             )
             input_tensors.append(text_x)
-            padding_masks.append(text_padding_mask)
         else:
-            text_mask = text_ids_restore = text_padding_mask = None
+            text_ids_restore  = None
 
         x = jnp.concatenate(input_tensors, axis=1)
-        padding_mask = jnp.concatenate(padding_masks, axis=1)
 
-        x = self.encoder(x, deterministic, padding_mask)
+        x = self.encoder(x, deterministic)
 
         cls_x = x[:, :1, :]
         if image is None:
             image_x = None
             text_x = x[:, 1:, :]
-        elif text is None:
+        elif embedding_patch is None:
             image_x = x[:, 1:, :]
             text_x = None
         else:
             image_x = x[:, 1:image_keep_length + 1, :]
             text_x = x[:, image_keep_length + 1:, :]
 
-        return cls_x, image_x, text_x, image_mask, text_mask, image_ids_restore, text_ids_restore
+        return cls_x, image_x, text_x, image_mask, image_ids_restore, text_ids_restore
 
     def forward_decoder(
         self,
         cls_x,
         image_x,
-        text_x,
+        embedding_x,
         image_ids_restore,
         text_ids_restore,
-        text_padding_mask,
         deterministic=False,
     ):
         batch_size = cls_x.shape[0]
@@ -612,39 +613,37 @@ class MaskedMultimodalAutoencoder(nn.Module):
             input_tensors.append(image_x)
             padding_masks.append(jnp.zeros((batch_size, image_ids_restore.shape[0]), dtype=jnp.float32))
 
-        if text_x is not None:
-            text_keep_length = int(
+        if embedding_x is not None:
+            embedding_keep_length = int(
                 text_ids_restore.shape[0] * (1.0 - self.config.text_mask_ratio)
             )
-            text_x = self.decoder_input_projection(text_x)
-            masked_text_x = jnp.broadcast_to(
-                self.text_mask_embedding,
+            embedding_x = self.decoder_input_projection(embedding_x)
+            masked_embedding_x = jnp.broadcast_to(
+                self.embedding_mask_embedding,
                 (
                     batch_size,
-                    text_ids_restore.shape[0] - text_keep_length,
+                    text_ids_restore.shape[0] - embedding_keep_length,
                     self.config.dec_emb_dim,
                 ),
             )
-            text_x = index_sequence(
-                jnp.concatenate([text_x, masked_text_x], axis=1), text_ids_restore
+            embedding_x = index_sequence(
+                jnp.concatenate([embedding_x, masked_embedding_x], axis=1), text_ids_restore
             )
-            text_x = (
-                text_x
-                + get_1d_sincos_pos_embed(self.config.dec_emb_dim, text_ids_restore.shape[0])
-                + self.get_type_embedding('decoder_text_type_embedding')
+            embedding_x = (
+                    embedding_x
+                    + get_1d_sincos_pos_embed(self.config.dec_emb_dim, text_ids_restore.shape[0])
+                    + self.get_type_embedding('decoder_embedding_type_embedding')
             )
-            input_tensors.append(text_x)
-            padding_masks.append(text_padding_mask)
+            input_tensors.append(embedding_x)
 
         x = jnp.concatenate(input_tensors, axis=1)
-        padding_mask = jnp.concatenate(padding_masks, axis=1)
-        x = self.decoder(x, deterministic, padding_mask)
+        x = self.decoder(x, deterministic)
 
         cls_x = x[:, :1, :]
         if image_x is None:
             image_output = None
             text_output = self.decoder_text_output(x[:, 1:, :])
-        elif text_x is None:
+        elif embedding_x is None:
             image_output = self.decoder_image_output(x[:, 1:, :])
             text_output = None
         else:
@@ -653,26 +652,26 @@ class MaskedMultimodalAutoencoder(nn.Module):
 
         return image_output, text_output
 
-    def __call__(self, image, text, text_padding_mask, deterministic=False):
+    def __call__(self, image, embedding, text_padding_mask, deterministic=False):
+        num_patches = embedding.shape[1] // self.config.embed_dim
+        embedding_patch = embedding.reshape(-1, num_patches, self.config.embed_dim)
         (
             cls_x,
             image_x,
-            text_x,
+            embedding_x,
             image_mask,
-            text_mask,
             image_ids_restore,
             text_ids_restore,
-        ) = self.forward_encoder(image, text, text_padding_mask, deterministic)
+        ) = self.forward_encoder(image, embedding_patch, deterministic)
         image_output, text_output = self.forward_decoder(
             cls_x,
             image_x,
-            text_x,
+            embedding_x,
             image_ids_restore,
             text_ids_restore,
-            text_padding_mask,
             deterministic,
         )
-        return image_output, text_output, image_mask, text_mask
+        return image_output, text_output, image_mask
 
 
 class MaskedAutoencoder(nn.Module):

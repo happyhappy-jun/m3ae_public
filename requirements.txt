@@ -1,13 +1,12 @@
--f https://storage.googleapis.com/jax-releases/libtpu_releases.html
-jax[tpu]==0.3.12
+jax==0.3.12
 flax==0.5.0
 optax==0.1.1
 distrax==0.1.2
 --extra-index-url https://download.pytorch.org/whl/cpu
-torch==1.10.2
-torchvision==0.11.3
+torch==1.11.0
+torchvision==0.12.0
 timm==0.5.4
-transformers==4.19.4
+transformers==4.26.1
 einops
 tqdm
 cloudpickle==2.0.0
