@@ -334,6 +334,9 @@ class EmbeddingEmbed(nn.Module):
     def __call__(self, x):
         # x shape: (batch_size, 3072)
 
+        # Stop gradients for x
+        x = jax.lax.stop_gradient(x)
+
         # First reshape the flat vector to (batch_size, num_patches, patch_dim)
         self.num_patches = x.shape[-1] // self.embed_dim
         x = x.reshape(-1, self.num_patches, self.embed_dim)
@@ -476,9 +479,9 @@ class MaskedMultimodalAutoencoder(nn.Module):
             input_norm=self.config.output_head_depth > 0,
         )
 
-        self.decoder_text_output = MLP(
+        self.decoder_embedding_output = MLP(
             self.config.dec_emb_dim,
-            self.text_vocab_size,
+            self.config.embed_dim,
             self.config.output_head_depth,
             input_norm=self.config.output_head_depth > 0,
         )
@@ -494,7 +497,7 @@ class MaskedMultimodalAutoencoder(nn.Module):
         else:
             return 0.0
 
-    def forward_representation(self, image, text, text_padding_mask, deterministic=False):
+    def forward_representation(self, image, embedding, deterministic=False):
         batch_size = image.shape[0]
         cls_token = jnp.broadcast_to(self.cls_token, (batch_size, 1, self.config.emb_dim))
         input_tensors = [cls_token]
@@ -506,10 +509,10 @@ class MaskedMultimodalAutoencoder(nn.Module):
             )
             input_tensors.append(image_x)
 
-        if text is not None:
+        if embedding is not None:
             embedding_x = (
-                self.embedding_embedding(text)
-                + get_1d_sincos_pos_embed(self.config.emb_dim, text.shape[1])
+                self.embedding_embedding(embedding)
+                + get_1d_sincos_pos_embed(self.config.emb_dim, embedding.shape[1])
                 + self.get_type_embedding('encoder_embedding_type_embedding')
             )
             input_tensors.append(embedding_x)
@@ -642,13 +645,13 @@ class MaskedMultimodalAutoencoder(nn.Module):
         cls_x = x[:, :1, :]
         if image_x is None:
             image_output = None
-            text_output = self.decoder_text_output(x[:, 1:, :])
+            text_output = self.decoder_embedding_output(x[:, 1:, :])
         elif embedding_x is None:
             image_output = self.decoder_image_output(x[:, 1:, :])
             text_output = None
         else:
             image_output = self.decoder_image_output(x[:, 1:image_ids_restore.shape[0] + 1, :])
-            text_output = self.decoder_text_output(x[:, image_ids_restore.shape[0] + 1:, :])
+            text_output = self.decoder_embedding_output(x[:, image_ids_restore.shape[0] + 1:, :])
 
         return image_output, text_output
 

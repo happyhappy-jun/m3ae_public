@@ -277,7 +277,6 @@ def main(argv):
 
     model = MaskedMultimodalAutoencoder(
         config_updates=FLAGS.m3ae,
-        text_vocab_size=dataset.vocab_size,
         image_output_dim=image_output_dim
     )
 
