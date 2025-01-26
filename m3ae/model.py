@@ -655,7 +655,7 @@ class MaskedMultimodalAutoencoder(nn.Module):
 
         return image_output, text_output
 
-    def __call__(self, image, embedding, text_padding_mask, deterministic=False):
+    def __call__(self, image, embedding, deterministic=False):
         num_patches = embedding.shape[1] // self.config.embed_dim
         embedding_patch = embedding.reshape(-1, num_patches, self.config.embed_dim)
         (

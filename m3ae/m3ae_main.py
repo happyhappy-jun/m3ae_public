@@ -307,11 +307,10 @@ def main(argv):
         del tokenizer_params
     else:
         image = jnp.zeros((2, image_sequence_length, image_patch_dim), dtype=jnp.float32)
-        text = jnp.zeros((2, dataset.config.tokenizer_max_length), dtype=jnp.int32)
-        text_padding_mask = jnp.zeros((2, dataset.config.tokenizer_max_length))
+        text = jnp.zeros((2, 3072), dtype=jnp.int32)
         rngs = next_rng(keys=model.rng_keys())
         params = model.init(
-            rngs, image, text, text_padding_mask, deterministic=False
+            rngs, image, text, deterministic=False
         )
 
         state = flax.jax_utils.replicate(
