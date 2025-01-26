@@ -5,7 +5,7 @@
 #SBATCH --error=/mnt/nas/slurm_account/junyoon/m3ae_public/logs/%j.err
 #SBATCH --gres=gpu:4090:8
 #SBATCH --cpus-per-gpu=4
-#SBATCH --mem-per-gpu=96G
+#SBATCH --mem-per-gpu=42G
 #SBATCH --time=3-00:00:00  # 3 days runtime
 
 # Load conda environment
