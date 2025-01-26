@@ -72,6 +72,8 @@ def mse_loss(logits, tokens, valid=None):
     # Add extra dimension to match logits shape
     tokens_reshaped = jnp.expand_dims(tokens_reshaped, -1)  # (512, 3072, 1)
 
+    print(logits.shape)
+    print(tokens_reshaped.shape)
     # Calculate MSE loss
     squared_diff = jnp.square(logits - tokens_reshaped)
     # Apply valid mask if needed
