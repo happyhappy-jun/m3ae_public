@@ -646,6 +646,7 @@ class MaskedMultimodalAutoencoder(nn.Module):
         x = self.decoder(x, deterministic)
 
         cls_x = x[:, :1, :]
+        print(x.shape)
         if image_x is None:
             image_output = None
             text_output = self.decoder_embedding_output(x[:, 1:, :])
