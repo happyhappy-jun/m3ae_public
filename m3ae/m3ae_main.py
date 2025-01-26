@@ -168,8 +168,7 @@ def create_train_step(model, learning_rate, encode_image=None, decode_image=None
     def patch_predict_fn(state, rng, batch):
         rng_generator = JaxRNG(rng)
         image = batch['image']
-        text = batch['text']
-        text_padding_mask = batch['text_padding_mask']
+        text = batch['embedding']
 
         image_patches = extract_patches(image, FLAGS.patch_size)
         if FLAGS.discretized_image:
@@ -179,7 +178,6 @@ def create_train_step(model, learning_rate, encode_image=None, decode_image=None
             state.params,
             image_patches,
             text,
-            text_padding_mask,
             deterministic=True,
             rngs=rng_generator(keys=model.rng_keys()),
         )
