@@ -63,9 +63,9 @@ python3 -m m3ae.mae_main \
 Pre-training M3AE (image and text model) on Conceptual 12M (CC12M)
 ```
 python3 -m m3ae.m3ae_main \
-    --m3ae.model_type='large' \
+    --m3ae.model_type='small' \
     --m3ae.image_mask_ratio=0.75 \
-    --m3ae.text_mask_ratio=0.75 \
+    --m3ae.embedding_mask_ratio=0.75 \
     --seed=42 \
     --epochs=100 \
     --lr_warmup_epochs=5 \
@@ -80,9 +80,9 @@ python3 -m m3ae.m3ae_main \
     --lr_peak_value=1.5e-4 \
     --weight_decay=0.05 \
     --load_checkpoint='' \
-    --data.path="<YOUR DATA HDF5 FILE PATH>" \
+    --data.path="/mnt/nas/slurm_account/junyoon/output_wembedding.h5" \
     --data.transform_type='pretrain' \
-    --data.image_normalization='cc12m'
+    --data.image_normalization='imagenet'
 ```
 
 Linear classification on ImageNet for both pre-trained MAE and M3AE

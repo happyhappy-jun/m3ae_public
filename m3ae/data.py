@@ -170,14 +170,6 @@ class ImageEmbeddingDataset(torch.utils.data.Dataset):
 
         return image, embedding
 
-    @property
-    def vocab_size(self):
-        return self.tokenizer.vocab_size
-
-    @property
-    def text_length(self):
-        return self.config.tokenizer_max_length
-
 
 class ImageNetDataset(torch.utils.data.Dataset):
     @staticmethod
@@ -417,9 +409,6 @@ class EmbeddingDataset(torch.utils.data.Dataset):
         embedding = self.h5_file["embedding"][index]
         return embedding.astype(np.float32)
 
-    @property
-    def vocab_size(self):
-        return self.tokenizer.vocab_size
 
 class TextDataset(torch.utils.data.Dataset):
     @staticmethod

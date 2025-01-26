@@ -543,7 +543,7 @@ class MaskedMultimodalAutoencoder(nn.Module):
 
         if embedding_patch is not None:
             text_keep_length = int(
-                embedding_patch.shape[1] * (1.0 - self.config.text_mask_ratio)
+                embedding_patch.shape[1] * (1.0 - self.config.embedding_mask_ratio)
             )
             text_x = (
                 embedding_patch
@@ -615,7 +615,7 @@ class MaskedMultimodalAutoencoder(nn.Module):
 
         if embedding_x is not None:
             embedding_keep_length = int(
-                text_ids_restore.shape[0] * (1.0 - self.config.text_mask_ratio)
+                text_ids_restore.shape[0] * (1.0 - self.config.embedding_mask_ratio)
             )
             embedding_x = self.decoder_input_projection(embedding_x)
             masked_embedding_x = jnp.broadcast_to(
